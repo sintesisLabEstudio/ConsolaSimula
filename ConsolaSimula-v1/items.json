@@ -1,0 +1,20 @@
+[
+  {
+    "idItem": 1,
+    "idUsuario": 1,
+    "nomItem": "nutricion",
+    "valorItem": 100000
+  },
+  {
+    "idItem": 2,
+    "idUsuario": 1,
+    "nomItem": "celular",
+    "valorItem": 6000
+  },
+  {
+    "idItem": 3,
+    "idUsuario": 1,
+    "nomItem": "internet",
+    "valorItem": 80000
+  }
+]
