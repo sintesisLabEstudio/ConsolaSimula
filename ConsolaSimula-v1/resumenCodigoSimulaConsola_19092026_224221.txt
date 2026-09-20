@@ -1,0 +1,499 @@
+RESUMEN CÓDIGO SIMULA CONSOLA
+
+FECHA: 19-09-2026 22:42:21
+RAÍZ ANALIZADA: C:\desarrollo\TNT\ConsolaSimula\ConsolaSimula-v1
+
+ALCANCE
+    Incluye todos los archivos de la raíz de aplicación y sus subcarpetas.
+    La carpeta .git contiene metadatos internos de Git y no se documenta archivo a archivo porque no pertenece al código ni a la ejecución de la aplicación.
+    El código de tejido ejecutable se presenta completo. Los archivos accesorios se inventarían sin código según su rol.
+
+ARCHIVOS
+    | NOMBRE | EXTENSIÓN | RUTA | UTILIDAD | ESTADO |
+    | Main | .kt | src\Main.kt | Aplicación, menú implícito, cálculo y persistencia | TEJIDO IMPRESCINDIBLE |
+    | usuarios | .json | usuarios.json | Usuarios persistidos | TEJIDO IMPRESCINDIBLE |
+    | items | .json | items.json | Gastos persistidos | TEJIDO IMPRESCINDIBLE |
+    | totales | .json | totales.json | Simulaciones persistidas | TEJIDO IMPRESCINDIBLE |
+    | resumenCodigoSimulaConsola_19092026_224221 | .txt | resumenCodigoSimulaConsola_19092026_224221.txt | Documento de trazabilidad generado | SOPORTE RECICLABLE |
+    | EstudioLab | .iml | EstudioLab.iml | Módulo IntelliJ y dependencias Gson/Kotlin | SOPORTE RECICLABLE |
+    | .gitignore | sin extensión | .gitignore | Exclusiones de control de versiones | SOPORTE RECICLABLE |
+    | .idea | varios | .idea\* | Preferencias y configuración del IDE | SOPORTE RECICLABLE |
+    | out | varios | out\production\EstudioLab\* | Clases compiladas | ARCHIVOS RECICLAJE |
+
+FLUJO GENERAL
+    [F01] main()
+        -> [F02] defineListaUsuarios() -> listaUsuarios
+        -> [F03] guardarUsuarios() -> usuarios.json
+        -> [F04] validaUsuario() -> indiceUsuarioActivo
+        -> [F05] ingresaItems() -> listaItems -> items.json
+        -> [F06] presentaItems() -> sumaItemsLista()
+        -> [F07] inputMontoDisponible() -> Simula -> totales.json
+        -> [F08] cargarUsuarios(), cargaListaItemsJson(), cargaTotalesJson()
+
+OBJETOS
+    [O01] Usuario: credenciales y clave de identidad.
+    [O02] Item: gasto mensual, vinculado a Usuario mediante idUsuario.
+    [O03] Simula: resultado de disponibilidad, vinculado a Usuario mediante idUsuario.
+
+PANTALLA CONSOLA
+    [P01] ACCESO
+        [P01-NOMBRE] Nombre de Usuario: readln() -> validaUsuario()
+        [P01-CLAVE] clave de Usuario: readln() -> compara passUsuario
+    [P02] INGRESO GASTO
+        [P02-NOMBRE-ITEM] ingrese Nombre del Item: readln() -> Item.nomItem
+        [P02-VALOR-ITEM] ingrese valor del Item: readln() -> Item.valorItem
+        [P02-CONTINUAR] Desea continuar s/n: readln() -> repite o termina
+    [P03] SIMULACIÓN
+        [P03-NOMBRE-SIM] nombre de simulación: readln() -> Simula.nomSim
+        [P03-MONTO] Monto total disponible: readln() -> Simula.monTot
+    [P04] SALIDA
+        Lista de usuarios, gastos y simulaciones cargados desde JSON.
+
+MAIN.KT
+    DETALLE: Único punto ejecutable; autentica, ingresa gastos, calcula simulación y persiste JSON.
+    DESCRIPCIÓN: Kotlin de consola. Depende de Gson 2.10.1 y de archivos relativos a la carpeta de trabajo. Mantiene estado mutable global durante toda la ejecución.
+    RELACIONES:
+        [R01] Usuario.idUsuario -> Item.idUsuario y Simula.idUsuario.
+        [R02] indiceUsuarioActivo recibe Usuario.idUsuario desde validaUsuario() y filtra los Item mostrados.
+        [R03] sumaItemsLista() entrega totItems a inputMontoDisponible().
+        [R04] Gson serializa/deserializa listaUsuarios, listaItems y listaSimulaciones.
+    CÓDIGO COMPLETO ANOTADO:
+
+//PARA JSON
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.File
+
+//------- CLASES
+data class Usuario(
+    var idUsuario: Int = 0,
+    var nikUsuario: String = "",
+    var passUsuario: String = ""
+)
+
+data class Item(
+    var idItem: Int,
+    var idUsuario: Int,
+    var nomItem: String,
+    var valorItem: Int
+)
+
+data class Simula(
+    var idUsuario: Int = 0,
+    var idSim: Int = 0,
+    var nomSim: String = "",
+    var monTot: Int = 0,
+    var totItems: Int = 0,
+    var mesesDisp: Int = 0,
+    var diasRest: Int = 0,
+    var dif: Int = 0
+)
+
+// SUGERENCIA IMPORTANTE: ESTOS IDENTIFICADORES IMPLEMENTAN LAS RELACIONES [R01] ENTRE USUARIO, ITEM Y SIMULA.
+
+// -- LISTAS GLOBALES
+val listaUsuarios = mutableListOf<Usuario>()
+val listaItems = mutableListOf<Item>()
+val listaSimulaciones = mutableListOf<Simula>()
+
+val gson = Gson()
+val archivoUsuarios = File("usuarios.json")
+var indiceUsuarioActivo=0
+val archivoTotales = File("totales.json")
+
+// SUGERENCIA IMPORTANTE: EL ESTADO GLOBAL HACE QUE LAS FUNCIONES DEPENDAN DEL ORDEN [F01]-[F08]; AGRUPARLO EN UNA CLASE REDUCIRÍA ACOPLAMIENTO.
+
+//------- FUNCIONES BASE
+fun defineListaUsuarios(){
+    listaUsuarios.add(Usuario(1,"jorge","clave"))
+    listaUsuarios.add(Usuario(2, "maria", "amelia"))
+
+}
+
+fun mostrarUsuarios() {
+    println("--- Lista de Usuarios ---")
+    listaUsuarios.forEach { usuario ->
+        println("ID: ${usuario.idUsuario} | Nick: ${usuario.nikUsuario}")
+    }
+}
+
+fun validaUsuario(): Usuario ?{
+    println("Nombre de Usuario")
+    val usuarioNom:String = readln()
+    val encontrado = listaUsuarios.find { it.nikUsuario == usuarioNom }
+    //si no encuentra el nombre sale de inmediato
+    if(encontrado == null){
+        println("no existe este usuario")
+        return null
+    } else {
+        println("clave de Usuario")
+        val usuarioPass= readln()
+        //obtiene clave correcta
+        if(encontrado.passUsuario==usuarioPass){
+            indiceUsuarioActivo=encontrado.idUsuario
+            // SUGERENCIA IMPORTANTE: ESTA ASIGNACIÓN CONECTA [P01] CON LOS FILTROS Y GRABACIONES POSTERIORES DE [O02] Y [O03].
+            println("clave correcta")
+            return encontrado
+        } else {
+            println("clave incorrecta")
+            return null
+        }
+    }
+}
+
+fun ingresaItems(){
+    println("-------------------------------------------------------\n")
+    println("ingreso de los items de gastos mensuales y sus valores")
+    println("-------------------------------------------------------\n")
+    //LOOP
+    while (true){
+        //NOMBRE ITEM
+        var itemNombre: String
+        while (true){
+            println("ingrese Nombre del Item")
+            itemNombre = readln()
+            if (itemNombre.isNotBlank() && itemNombre.toIntOrNull() == null) {
+                // permitir textos que contengan letras y números mezclados (como "Dpto 101"
+                break
+            } else {
+                println("Error: No puede ingresar un número como nombre.")
+            }
+        }
+        //VALOR ITEM
+        println("ingrese valor del Item")
+        val itemValor = readln().toIntOrNull() ?: 0
+
+        //INDICE LISTA
+        val indiceLista: Int=listaItems.size + 1
+
+        //INGRESA ITEM LISTA
+        if(itemNombre != null && itemValor>=0){
+            // SUGERENCIA IMPORTANTE: idItem SE CALCULA SOBRE LA LISTA COMPLETA, INCLUSO SI CONTIENE ITEMS DE OTROS USUARIOS.
+            listaItems.add(Item(indiceLista,indiceUsuarioActivo,itemNombre,itemValor))
+        }
+
+        //CONSULTA SALIDA
+        println("---------------------\n")
+        println("Desea continuar s/n")
+        val continuar = readln()
+        if(continuar=="n" || continuar=="N"){
+            break
+        }
+    }
+    //guarda en json archivo
+    if(listaItems.isNotEmpty()){
+        // SUGERENCIA IMPORTANTE: LA PERSISTENCIA [F05] SOBRESCRIBE items.json CON TODA listaItems.
+        guardarItemsEnJsonManual()
+    }
+}
+
+fun presentaItems(){
+    println("Presenta los items de gastos mensuales y sus valores")
+    println("-------------------------------------------------------\n")
+    val itemsUsuario = listaItems.filter { it.idUsuario==indiceUsuarioActivo }
+    if(itemsUsuario.isEmpty()){
+        println("No hay items ingresados")
+    }else {
+        itemsUsuario.forEach{
+            item -> println("ID: ${item.idItem} | ITEM: ${item.nomItem} | VALOR: ${item.valorItem}")
+        }
+    }
+    val total =sumaItemsLista()
+    // SUGERENCIA IMPORTANTE: sumaItemsLista() NO FILTRA POR indiceUsuarioActivo; EL TOTAL PUEDE INCLUIR GASTOS AJENOS A [P02].
+    println("El valor total de los items es: $total")
+}
+
+fun sumaItemsLista(): Int {
+    if(listaItems.isEmpty()){
+        return 0
+    }else {
+        var total: Int =0
+        listaItems.forEach{
+                item -> total+=item.valorItem
+        }
+        return total
+    }
+}
+
+fun guardarItemsEnJsonManual() {
+    val jsonString = listaItems.joinToString(
+        prefix = "[\n",
+        postfix = "\n]",
+        separator = ",\n"
+    ) { item ->
+        """  {
+    "idItem": ${item.idItem},
+    "idUsuario": ${item.idUsuario},
+    "nomItem": "${item.nomItem}",
+    "valorItem": ${item.valorItem}
+  }"""
+    }
+    // Guarda el String generado en el archivo
+    File("items.json").writeText(jsonString)
+    println("¡Lista guardada en items.json!")
+
+    //RUTA
+    val archivo = File("items.json")
+    // SUGERENCIA IMPORTANTE: ESTA SEGUNDA ESCRITURA ES REDUNDANTE; AMBAS SOBRESCRIBEN EL MISMO ARCHIVO CON EL MISMO CONTENIDO.
+    archivo.writeText(jsonString)
+    // Imprime la ruta absoluta exacta (ej: C:\Usuarios\TuNombre\IdeaProjects\MiProyecto\items.json)
+    println("Archivo guardado en: ${archivo.absolutePath}")
+}
+
+fun cargaListaItemsJson() {
+    val archivo = File("items.json")
+
+    if (archivo.exists()) {
+        val json = archivo.readText()
+        val tipoLista = object : TypeToken<MutableList<Item>>() {}.type
+
+        val listaCargada: MutableList<Item> = gson.fromJson(json, tipoLista)
+
+        listaItems.clear()
+        listaItems.addAll(listaCargada)
+
+        println("=== LISTA DE ITEMS CARGADOS DESDE DISCO ===")
+        listaItems.forEach { item ->
+            println("ID Item: ${item.idItem} | ID Usuario: ${item.idUsuario} | Nombre: ${item.nomItem} | VALOR: ${item.valorItem}")
+        }
+    } else {
+        println("Error: No se encontró el archivo items.json en el disco.")
+    }
+}
+
+fun guardarUsuarios() {
+    val jsonString = gson.toJson(listaUsuarios)
+    archivoUsuarios.writeText(jsonString)
+    println("Lista de usuarios guardada en JSON.")
+}
+
+fun cargarUsuarios() {
+    if (archivoUsuarios.exists()) {
+        val jsonString = archivoUsuarios.readText()
+        val tipoLista = object : TypeToken<MutableList<Usuario>>() {}.type
+        val listaCargada: MutableList<Usuario> = gson.fromJson(jsonString, tipoLista)
+        listaUsuarios.clear()
+        listaUsuarios.addAll(listaCargada)
+        // DESPLIEGUE EN CONSOLA
+        println("=== LISTA DE USUARIOS CARGADOS DESDE DISCO ===")
+        listaUsuarios.forEach { u ->
+            println("ID: ${u.idUsuario} | Nick: ${u.nikUsuario}")
+        }
+    } else {
+        println("No se encontró el archivo JSON. Se iniciará con lista por defecto.")
+        defineListaUsuarios()
+    }
+}
+
+fun inputMontoDisponible() {
+    val itemsTotal = sumaItemsLista()
+    if (itemsTotal <= 0) {
+        println("El total de items debe ser mayor a 0.")
+        return
+    }
+
+    // 1. Pedir un nombre para la simulación
+    println("Ingrese un nombre para esta simulación:")
+    val nombreSim = readln()
+
+    println("Ingrese el Monto total disponible:")
+    val montoTotal: Int = readln().toIntOrNull() ?: 0
+
+    // Cálculos
+    val meses: Int = montoTotal / itemsTotal
+    val diferencia: Int = montoTotal % itemsTotal
+    val gastoDiarioBase: Double = itemsTotal / 30.0
+    val dias: Int = if (gastoDiarioBase > 0) (diferencia / gastoDiarioBase).toInt() else 0
+    val montoDiario: Double = if (dias > 0) diferencia.toDouble() / dias else 0.0
+
+    // SUGERENCIA IMPORTANTE: itemsTotal PROVIENE DE [F06]; PARA AISLAR AL USUARIO ACTIVO, SUME SOLO Item.idUsuario == indiceUsuarioActivo.
+
+    // Presentación
+    println("\n--- RESULTADO ---")
+    println("Meses disponibles: $meses")
+    println("Diferencia sobrante: $$diferencia")
+    if (dias > 0) {
+        val diarioFormateado = String.format("%.2f", montoDiario)
+        println("La diferencia de $$diferencia se distribuye en $dias días con un monto de $$diarioFormateado diario.")
+    } else if (diferencia > 0) {
+        println("La diferencia de $$diferencia no alcanza para cubrir un día completo.")
+    }
+
+    // 2. CREAR EL OBJETO CON LOS DATOS CALCULADOS
+    val nuevaSimulacion = Simula(
+        idUsuario = indiceUsuarioActivo,
+        idSim = listaSimulaciones.size + 1,
+        nomSim = nombreSim,
+        monTot = montoTotal,
+        totItems = itemsTotal,
+        mesesDisp = meses,
+        diasRest = dias,
+        dif = diferencia
+    )
+
+    // 3. GUARDAR EL OBJETO EN LA LISTA GLOBAL
+    listaSimulaciones.add(nuevaSimulacion)
+
+    // 4. AHORA SÍ GUARDAR EN EL ARCHIVO JSON
+    // SUGERENCIA IMPORTANTE: [O03] RECIBE LOS CÁLCULOS Y SE SERIALIZA INMEDIATAMENTE A totales.json POR [F07].
+    grabaTotalesJson()
+}
+
+fun grabaTotalesJson() {
+    val jsonString = gson.toJson(listaSimulaciones)
+    archivoTotales.writeText(jsonString)
+    println("-> Totales guardados correctamente en totales.json")
+}
+
+fun cargaTotalesJson() {
+    if (archivoTotales.exists() && archivoTotales.length() > 0) {
+        val jsonString = archivoTotales.readText()
+        val tipoLista = object : TypeToken<MutableList<Simula>>() {}.type
+
+        val listaCargada: MutableList<Simula> = gson.fromJson(jsonString, tipoLista)
+
+        listaSimulaciones.clear()
+        listaSimulaciones.addAll(listaCargada)
+
+        println("\n=== LISTA DE TOTALES / SIMULACIONES CARGADAS ===")
+        listaSimulaciones.forEach { s ->
+            println("Simulación: ${s.nomSim} (ID: ${s.idSim}) | Usuario ID: ${s.idUsuario}")
+            println("   Monto Total: $${s.monTot} | Gastos Mensuales: $${s.totItems}")
+            println("   Meses Disponibles: ${s.mesesDisp} | Días Extra: ${s.diasRest} días | Diferencia: $${s.dif}")
+            println("--------------------------------------------------")
+        }
+    } else {
+        println("-> El archivo totales.json no existe o está vacío.")
+    }
+}
+
+fun main() {
+    //CARGA LISTA USUARIOS
+    defineListaUsuarios()
+    guardarUsuarios()
+
+    // INTENTOS 3
+    for (intento in 1..3) {
+        println("\n--- Intento $intento de 3 ---")
+        val datosUsuario: Usuario?= validaUsuario()
+        if(datosUsuario!=null){
+            println("ingresando a ${datosUsuario.nikUsuario} a SIMULA ")
+            break
+        }
+    }
+    //SI EL USUARIO NO ESTA ACTIVO SALE DE INMEDIATO
+    if(indiceUsuarioActivo<=0){
+        println("Usuario no activo")
+        return
+    }
+
+    //INGRESO ITEMS GASTOS MES
+    ingresaItems()
+
+    //PRESENTA ITEM DATOS
+    presentaItems()
+
+    //INPUT Y CALCULO MESES
+    inputMontoDisponible()
+
+    //presenta usuarios
+    cargarUsuarios()
+
+    //presenta items
+    cargaListaItemsJson()
+
+    //presenta totales
+    cargaTotalesJson()
+}
+
+ARCHIVOS DATOS
+    DETALLE: Persistencia local JSON que utiliza Gson o escritura manual.
+    DESCRIPCIÓN: Son parte del tejido imprescindible. Cada archivo está en la raíz de ejecución y se sobrescribe durante una sesión.
+
+USUARIOS.JSON
+    DETALLE: Usuarios de acceso.
+    DESCRIPCIÓN: Consumido por cargarUsuarios() y producido por guardarUsuarios(). En el flujo actual main() lo reemplaza con los valores definidos antes de validar.
+    CÓDIGO COMPLETO:
+[
+  {"idUsuario":1,"nikUsuario":"jorge","passUsuario":"clave"},
+  {"idUsuario":2,"nikUsuario":"maria","passUsuario":"amelia"}
+]
+
+ITEMS.JSON
+    DETALLE: Gastos mensuales del usuario 1.
+    DESCRIPCIÓN: Consumido por cargaListaItemsJson() y producido por guardarItemsEnJsonManual(). idUsuario es la relación con Usuario.
+    CÓDIGO COMPLETO:
+[
+  {
+    "idItem": 1,
+    "idUsuario": 1,
+    "nomItem": "nutricion",
+    "valorItem": 100000
+  },
+  {
+    "idItem": 2,
+    "idUsuario": 1,
+    "nomItem": "celular",
+    "valorItem": 6000
+  },
+  {
+    "idItem": 3,
+    "idUsuario": 1,
+    "nomItem": "internet",
+    "valorItem": 80000
+  }
+]
+
+TOTALES.JSON
+    DETALLE: Última simulación persistida.
+    DESCRIPCIÓN: Consumido por cargaTotalesJson() y producido por grabaTotalesJson(). Conserva los cálculos de inputMontoDisponible().
+    CÓDIGO COMPLETO:
+[{"idUsuario":1,"idSim":1,"nomSim":"janveraSim","monTot":350000,"totItems":186000,"mesesDisp":1,"diasRest":26,"dif":164000}]
+
+CÓDIGO ALTERNATIVO
+    DETALLE: Corrección mínima para que el total sea específico del usuario activo.
+    DESCRIPCIÓN: Sustituir sumaItemsLista() por esta variante cambia [R03] para sumar exclusivamente los Item relacionados con [R02].
+
+fun sumaItemsUsuarioActivo(): Int {
+    return listaItems
+        .filter { it.idUsuario == indiceUsuarioActivo }
+        .sumOf { it.valorItem }
+}
+
+    DETALLE: Persistencia de items con Gson.
+    DESCRIPCIÓN: Evita construcción manual de JSON, escapado incompleto de nomItem y la escritura duplicada de guardarItemsEnJsonManual().
+
+fun guardarItemsEnJson() {
+    File("items.json").writeText(gson.toJson(listaItems))
+    println("Lista guardada en: ${File("items.json").absolutePath}")
+}
+
+SOPORTE RECICLABLE
+    DETALLE: Configuración útil para abrir o compilar en IntelliJ, pero no participa en el flujo de negocio en tiempo de ejecución.
+    DESCRIPCIÓN: Se presentan sin código porque son accesorios de otras carpetas o herramientas.
+    .gitignore
+    .git\* (metadatos internos de control de versiones, excluidos del detalle individual)
+    EstudioLab.iml
+    .idea\.gitignore
+    .idea\codeStyles\codeStyleConfig.xml
+    .idea\codeStyles\Project.xml
+    .idea\inspectionProfiles\Project_Default.xml
+    .idea\kotlinc.xml
+    .idea\libraries\gson_2_10_1.xml
+    .idea\libraries\KotlinJavaRuntime.xml
+    .idea\misc.xml
+    .idea\modules.xml
+    .idea\vcs.xml
+    .idea\workspace.xml
+
+ARCHIVOS RECICLAJE
+    DETALLE: Salidas generadas de compilación; se pueden regenerar desde src\Main.kt.
+    DESCRIPCIÓN: No son parte del tejido fuente y no se presenta su código binario.
+    out\production\EstudioLab\Item.class
+    out\production\EstudioLab\MainKt$cargaListaItemsJson$tipoLista$1.class
+    out\production\EstudioLab\MainKt$cargarUsuarios$tipoLista$1.class
+    out\production\EstudioLab\MainKt$cargaTotalesJson$tipoLista$1.class
+    out\production\EstudioLab\MainKt.class
+    out\production\EstudioLab\META-INF\EstudioLab.kotlin_module
+    out\production\EstudioLab\Simula.class
+    out\production\EstudioLab\Usuario.class
